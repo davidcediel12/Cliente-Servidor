@@ -27,27 +27,24 @@ class VentilatorElbow:
         self.from_sink.bind(f"tcp://{self.my_dir_sink}")
 
     
-    def sendInitialData(self, n_clusters, n_data, n_features, centroids):
+    def sendInitialData(self):
         i = 0 
         #Para no enviarle el dataset en cada iteracion, se le envia el nombre
         #que ellos deben abrir 
-        while i < n_data:
+        while i < self.n_data:
             self.to_workers.send_json({
                 "action" : "new_dataset",
                 "name_dataset" : self.name_dataset,
-                "n_clusters" : n_clusters,
-                "n_features" : n_features,
                 "has_tags" : self.has_tags,
                 "chunk" : self.chunk_worker,
                 "distance_metric" : self.distance_metric,
-                "centroids" : centroids
             })
             i += self.chunk_worker
 
         #Calculando el numero de operaciones que se haran
         #para decirle al sink lo que debe esperar
-        opers = n_data // self.chunk_worker
-        if n_data % self.chunk_worker != 0:
+        opers = self.n_data // self.chunk_worker
+        if self.n_data % self.chunk_worker != 0:
             opers += 1
 
         self.to_sink.send_json({
@@ -55,40 +52,71 @@ class VentilatorElbow:
             "opers" : opers
         })
     
-    def sendSecondData(self, n_data, centroids):
-        i = 0 
-        while i < n_data:
-            self.to_workers.send_json({
-                "action" : "update_centroids",
-                "centroids" : centroids
-            })
-            i += self.chunk_worker
-            
+
+    
+    def showResult(self, distorsions):
+        plt.plot(self.n_clusters, distorsions)
+        plt.vlines(self.optimum_k, distorsions[0], distorsions[-1], linestyles = "dashed")
+        plt.show()
+        name_fig = self.name_dataset.split(".")[0] + "_elbow.png"
+        plt.savefig(f"results_elbow/{name_fig}")
+
+
+    def obtainDistancesPointRect(self, distorsions):
+        # y2-y1/x2-x1
+        m = (distorsions[-1] - distorsions[0])/(self.n_clusters[-1] - self.n_clusters[0])
+
+        A = -1*m
+        B = 1
+        C = m*self.n_clusters[0] - distorsions[0]
+        
+        distances = []
+        for (x, y) in zip(self.n_clusters, distorsions):
+            distances.append(abs(A*x + B*y + C) / np.sqrt(A**2 + B**2))
+        
+        print("Distances\n", distances)
+        return distances
+
+    def ternarySearch(self, left, right, values, iters = 0):
+        print("Iters", iters)
+        if left == right:
+            return self.n_clusters[left]
+
+        if right - left == 1:
+            if values[left] > values[right]:
+                return self.n_clusters[left]
+            else:
+                return self.n_clusters[right] 
+
+        m1 = left + (right-left)//3
+        m2 = right - (right-left)//3
+        # print(values[m1], values[m2])
+        if values[m1] <= values[m2]:
+            return self.ternarySearch(m1+1, right, values, iters + 1)
+        elif values[m1] > values[m2]:
+            return self.ternarySearch(left, m2 - 1, values, iters + 1)
 
     def elbowMethod(self):
         #Metodo k_means paralelizado.
         input("Press enter when workers elbow are ready")
         
         distorsions = []
-        n_clusters = [i for i in range(self.n_clusters_min, self.n_clusters_max +1)]
-        for n_cluster in range(self.n_clusters_min, self.n_clusters_max + 1):
+        self.n_clusters = [i for i in range(self.n_clusters_min, self.n_clusters_max +1)]
+        self.sendInitialData()
+        for n_cluster in self.n_clusters:
             ventilator = Ventilator(self.name_dataset, self.has_tags, 
                                     "127.0.0.1:5555", "127.0.0.1:5556", 
                                     "127.0.0.1:5557", self.n_data, self.n_features, 
                                     n_cluster, self.distance_metric)
             ventilator.kmeans()
-            centroids = ventilator.centroids
-            n_data = ventilator.n_data
-
-            if n_cluster == self.n_clusters_min:
-                n_features = ventilator.n_features
-                self.sendInitialData(n_cluster, n_data, n_features, centroids)
-            else:
-                self.sendSecondData(n_data, centroids)
+            centroids = ventilator.centroids    
+            
             i = 0
-            while i < n_data:
+            while i < self.n_data:
                 self.to_workers.send_json({
                     "action" : "distance",
+                    "n_clusters" : len(centroids),
+                    "centroids" : centroids,
                     "type_distance" : self.distance_metric,
                     "position" : i
                 })
@@ -98,10 +126,13 @@ class VentilatorElbow:
             distorsions.append(float(self.from_sink.recv_string()))
             print("Distorsion recieved")
             self.from_sink.send(b" ")
-        plt.plot(n_clusters, distorsions)
-        plt.show()
-        name_fig = self.name_dataset.split(".")[0] + "_elbow.png"
-        plt.savefig(f"results_elbow/{name_fig}")
+
+        
+        #self.obtainOptimumK(distorsions)
+        self.optimum_k = self.ternarySearch(0, len(distorsions), self.obtainDistancesPointRect(distorsions))
+
+        #Mostrando resultados
+        self.showResult(distorsions)
     
     def __init__(self, name_dataset, has_tags, my_dir, 
                     my_dir_sink, dir_sink, n_data, 

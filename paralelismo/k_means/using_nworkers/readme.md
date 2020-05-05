@@ -55,7 +55,7 @@ Cabe recalcar que:
 8. Número de clusters máximo
 9. Opcional: Si el dataset lleva tags se pone -t
 10. Tipo de distancia que usara el metodo k means
-#### python ventilator_elbow.py 127.0.0.1:6565 127.0.0.1:6566 127.0.0.1:6567 hola.csv 1000 2 2 6 [-t] [euclidean|angular]
+#### python ventilator_elbow.py 127.0.0.1:6565 127.0.0.1:6566 127.0.0.1:6567 4c2f.csv 1000 2 2 6 [-t] [euclidean|angular]
 
 ### Sink  elbow
 1. Direccion del sink

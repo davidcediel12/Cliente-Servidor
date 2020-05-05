@@ -42,7 +42,6 @@ class Worker:
                             f"_result{self.n_clusters}c.csv")
         print("New name tag:", self.name_tags)
         self.centroids = msg["centroids"]
-        self.n_features = msg["n_features"]
         self.chunk = msg["chunk"]
         self.distance_metric = msg["distance_metric"]
         print("Recieved first message")
@@ -72,7 +71,7 @@ class Worker:
             elif msg["action"] == "update_centroids" and not updated_centroids:
                 #Cuando llegan nuevo centroides
                 updated_centroids = True
-                self.n_clusters += 1
+                self.n_clusters = int(msg["n_clusters"])
                 self.centroids = msg["centroids"]
                 self.name_tags = (self.name_dataset.split(".")[0] + 
                             f"_result{self.n_clusters}c.csv")

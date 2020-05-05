@@ -37,20 +37,13 @@ class Worker:
         #Por ahora no se usa, ya que como no se cuantos workers tengo
         #no puedo enviar el data set al inicio
         self.name_dataset = msg["name_dataset"]
-        self.n_clusters = msg["n_clusters"]
-        self.name_tags = (self.name_dataset.split(".")[0] + 
-                            f"_result{self.n_clusters}c.csv")
-        print("New name tag:", self.name_tags)
-        self.centroids = np.asarray(msg["centroids"])
-        #print(self.centroids)
-        self.n_features = msg["n_features"]
         self.chunk = msg["chunk"]
         self.distance_metric = msg["distance_metric"]
-        print("Recieved first message")
         self.has_tags  = msg["has_tags"]
+        print("Recieved first message")
+        
 
     def calculateDistances(self, points, tags):
-        
         distorsion = 0
         for (p, tag) in zip(points, tags):
             tag = int(tag)
@@ -62,24 +55,17 @@ class Worker:
     
     
     def listen(self): 
-        updated_centroids = False
         print("Ready")
         while True:
             msg = self.from_ventilator.recv_json()
             if msg["action"] == "new_dataset":
                     self.recieveInitialData(msg)
-                    updated_centroids = False
-            elif msg["action"] == "update_centroids" and not updated_centroids:
-                updated_centroids = True
-                self.n_clusters += 1
+                    
+            elif msg["action"] == "distance":
                 self.centroids = np.asarray(msg["centroids"])
-                #print(self.centroids)
+                self.n_clusters  = int(msg["n_clusters"])
                 self.name_tags = (self.name_dataset.split(".")[0] + 
                             f"_result{self.n_clusters}c.csv")
-                print("New name tag:", self.name_tags)
-                
-            elif msg["action"] == "distance":
-                updated_centroids = False
                 ini = msg["position"]
                 print("Calculating distorsion")
                 points, tags = self.readPartDataset(ini)

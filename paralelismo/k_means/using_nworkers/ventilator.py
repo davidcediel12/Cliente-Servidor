@@ -200,7 +200,7 @@ class Ventilator:
             y_new = result["y"]
             self.centroids = result["centroids"]
 
-            print(sorted(size_clusters))
+           # print(sorted(size_clusters))
 
             falses = np.equal(self.y, np.asarray(y_new))
             falses = np.sum(np.where(falses == False, 1, 0))
@@ -218,8 +218,8 @@ class Ventilator:
         print("END")
         self.writeTags()
 
-        if self.n_features == 2:
-            self.showResult()
+        # if self.n_features == 2:
+        #     self.showResult()
         
         self.closeSockets()
     

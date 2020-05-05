@@ -44,7 +44,7 @@ def cosineSimilaritySparseManual(p1, p2):
     norm_a = 0
     norm_b = 0
     ab = 0
-    for key in p1.keys():
+    for key in all_keys.keys():
         a = p1.get(key, 0)
         b = p2.get(key, 0)
 
@@ -133,8 +133,7 @@ def readChunkSparse(n_rows, offset, name_dataset, column_size, dtype=np.float32)
 
         return matrix
 
-def hola():
-    print("Hola")
+
 def sumPointsDict(p1, p2):
     #Suma dos puntos dispersos que estan en forma de diccionario
     new_point = {**p1, **p2}
