@@ -69,71 +69,82 @@ class VentilatorElbow:
 
 
     def obtainDistance(self, distorsion, n_cluster):
+        #Retorna la distancia de un punto (n_cluster, distorsion) a 
+        # la recta inicial (k_ini, distorsion):(k_fin, distorsion) 
         distance = abs(self.A*n_cluster + distorsion + self.C) / np.sqrt(self.A**2 + 1)
         self.distances.append(distance)
         return distance
 
-    def ternarySearch(self, left, right, iters = 0):
-        print("Iters", iters)
-        if left == right:
-            if self.n_clusters[left] not in self.analized_n_clusters:
-                self.obtainDistorsion(self.n_clusters[left])
+    def obtainPendiente(self, p1, p2):
+        # y2-y1 / x2-x1
+        #print(p1, p2)
+        return abs((p2[1] - p1[1]) / (p2[0] - p1[0]))
 
-            return self.n_clusters[left] 
+    def binarySearch(self, number, distorsion, distance_rect):
 
-        if right - left == 1:
-            
-            #Analizando las distorsiones
-            if self.n_clusters[left] not in self.analized_n_clusters:
-                value_left = self.obtainDistorsion(self.n_clusters[left])
-                value_left = self.obtainDistance(value_left, self.n_clusters[left])
-            else:
-                value_left = self.distances[self.analized_n_clusters.index(self.n_clusters[left])]
+        #Hallo las dos pendientes para ver que intervalo analizo primero 
+        pendiente_ini = self.obtainPendiente((number, distorsion), self.init_point)
+        pendiente_fin = self.obtainPendiente((number, distorsion), self.end_point)
 
-            
 
-            if self.n_clusters[right] not in self.analized_n_clusters:
-                value_right = self.obtainDistorsion(self.n_clusters[right])
-                value_right = self.obtainDistance(value_right, self.n_clusters[right])
-            else:
-                value_right = self.distances[self.analized_n_clusters.index(self.n_clusters[right])]
-
-            
-            
-            #Hallando el valor optimo de k 
-            if value_left > value_right:
-                return  self.n_clusters[left]
-            else:
-                return self.n_clusters[right] 
-
-    
+        left = number - (number//2)
+        right = number + (number//2)
         
-        m1 = left + (right-left)//3
-        m2 = right - (right-left)//3
+        if left in self.analized_n_clusters and right in self.analized_n_clusters:
+            #Ya analice todas las particiones y no tengo para donde moverme
+            return number 
 
-        if self.n_clusters[m1] not in self.analized_n_clusters:
-            value_m1 = self.obtainDistorsion(self.n_clusters[m1])
-            value_m1 = self.obtainDistance(value_m1, self.n_clusters[m1])
+
+        # Elijo que lado voy a explorar primero, con base en las pendientes
+        # halladas, me voy por el lado que tenga mas pendiente 
+        if pendiente_ini >= pendiente_fin:
+            priority_queue = [left, right]
         else:
-            value_m1 = self.distances[self.analized_n_clusters.index(self.n_clusters[m1])]
+            priority_queue = [right, left]
 
-        if self.n_clusters[m2] not in self.analized_n_clusters:
-            value_m2 = self.obtainDistorsion(self.n_clusters[m2])
-            value_m2 = self.obtainDistance(value_m2, self.n_clusters[m2])
+        
+        #Analizo la primera parte del intervalo, si la distancia a la recta 
+        # inicial resulta ser mayor, me voy por ahi, si no, recurro al otro 
+        # lado 
+
+        # Si no he hecho k_means para este numero lo hago, si ya lo hice 
+        # lo busco en el atributo de la clase 
+        if priority_queue[0] not in self.analized_n_clusters:
+            distorsion1 = self.obtainDistorsion(priority_queue[0])
         else:
-            value_m2 = self.distances[self.analized_n_clusters.index(self.n_clusters[m2])]
-       
+            distorsion1 = self.distorsions[self.analized_n_clusters.index(priority_queue[0])]
+        
+        
+        distance1 = self.obtainDistance(distorsion1, priority_queue[0])
 
-        # print(values[m1], values[m2])
-        if value_m1 <= value_m2:
-            return self.ternarySearch(m1+1, right, iters + 1)
-        elif value_m1 > value_m2:
-            return self.ternarySearch(left, m2 - 1, iters + 1)
+        if distance1 >= distance_rect:
+            return self.binarySearch(priority_queue[0], distorsion1, distance1)
+
+
+        #En caso de que la distancia del primer intervalo sea menor, analizo el 
+        #segundo intervalo, si es mayor, nunca se ejecutara esta parte del codigo
+        if priority_queue[1] not in self.analized_n_clusters:
+            distorsion2 = self.obtainDistorsion(priority_queue[1])
+        else:
+            distorsion2 = self.distorsions[self.analized_n_clusters.index(priority_queue[1])]
+        
+        distance2 = self.obtainDistance(distorsion2, priority_queue[1])
+
+        if distance2 >= distance_rect:
+            return self.binarySearch(priority_queue[1], distorsion2, distance2)
+
+
+        #Si llega hasta aqui es porque la distancia a la recta de ambos intervalos 
+        # es menor, por lo que la solucion es peor, entonces puedo concluir que el 
+        # k optimo es el numero que le llego         
+        return number 
+
+
 
     def obtainDistorsion(self, n_cluster):
         #Metodo k_means paralelizado.
+        print(f"K_means for {n_cluster} clusters")
         
-        print(f"K means for {n_cluster} clusters")
         ventilator = Ventilator(self.name_dataset, self.has_tags, 
                                 "127.0.0.1:5555", "127.0.0.1:5556", 
                                 "127.0.0.1:5557", self.n_data, self.n_features, 
@@ -163,13 +174,25 @@ class VentilatorElbow:
 
     
     def elbowMethod(self):
+        #Obtiene la distorsion para el k_min y el k_max, luego llama 
+        #a binary search para realizar la busqueda
         input("Press enter when workers elbow are ready")
         self.analized_n_clusters = []
         self.distorsions = []
         self.sendInitialData()
 
         self.obtainRect()
-        self.optimum_k = self.ternarySearch(0, len(self.n_clusters))
+        
+        #Hago el k means para la mitad de los datos, como es el primero, siempre
+        # se analiza. 
+        partition = (self.n_clusters[0] + self.n_clusters[-1]) // 2
+        distorsion_ini = self.obtainDistorsion(partition)
+        distance_ini = self.obtainDistance(distorsion_ini, partition)
+
+        #Busco el k optimo mediante busqueda binaria
+        self.optimum_k = self.binarySearch(partition, distorsion_ini, distance_ini)
+
+
         print("Clusters: \n", self.analized_n_clusters)
         print("Distorsions: \n", self.distorsions)
         print("Distances: \n", self.distances)
@@ -179,11 +202,12 @@ class VentilatorElbow:
 
 
     def obtainRect(self):
+        #Obtiene la recta inicial del menor numero de k al mayor numero de k
         max_distorsion = self.obtainDistorsion(self.n_clusters[0])
-        
+        self.init_point = (self.n_clusters[0], max_distorsion)
 
         min_distorsion = self.obtainDistorsion(self.n_clusters[-1])
-        
+        self.end_point = (self.n_clusters[-1], min_distorsion)
          
         # -m 
         self.A = -1 * (min_distorsion - max_distorsion)/(self.n_clusters[-1] - self.n_clusters[0])

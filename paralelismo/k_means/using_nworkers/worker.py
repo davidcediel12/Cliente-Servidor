@@ -45,7 +45,9 @@ class Worker:
         sum_points = np.zeros((self.n_clusters, self.n_features))
         for p in (points):
             distance_point = []
+            print("Point", p.shape)
             for centroid in centroids:
+                print(f"Centroid: {len(centroid)}")
                 if self.distance_metric == "euclidean":
                     distance_point.append(distance.euclidean(p, centroid))
                 elif self.distance_metric == "angular":

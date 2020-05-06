@@ -28,7 +28,7 @@ En esta aproximacion, el ventilator:
 
 class Ventilator:
     max_iters = 100000
-    chunk_worker = 100
+    chunk_worker = 10000
     tolerance = 0.01
 
     def createSockets(self):
@@ -64,6 +64,7 @@ class Ventilator:
     def createCentroids(self):
         #Creamos los centroides de manera aleatoria en el rango de cada 
         #caracteristica
+        print("Creating centroids")
         self.centroids = []
         for i in range(self.n_clusters):
             number = np.random.randint(1, high=self.n_data-1)
@@ -184,6 +185,7 @@ class Ventilator:
         changing = True
         iters = 0
         while changing and iters < self.max_iters:
+            init_time = time.time()
             iters += 1
             print("Iters", iters)
             print("Operating")
@@ -200,8 +202,8 @@ class Ventilator:
             y_new = result["y"]
             self.centroids = result["centroids"]
 
-           # print(sorted(size_clusters))
-
+           
+            print(f"Iter time: {(time.time()-init_time) /60}")
             falses = np.equal(self.y, np.asarray(y_new))
             falses = np.sum(np.where(falses == False, 1, 0))
             #Si ningun punto ha cambiado de cluster paro de iterar
@@ -214,7 +216,7 @@ class Ventilator:
                     print("EMPTY CLUSTER")
                     self.createCentroids()
                 self.y = y_new.copy()
-
+        print("Sizes", sorted(size_clusters))
         print("END")
         self.writeTags()
 
