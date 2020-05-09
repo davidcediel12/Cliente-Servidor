@@ -43,6 +43,7 @@ class VentilatorElbow:
                 "has_tags" : self.has_tags,
                 "chunk" : self.chunk_worker,
                 "distance_metric" : self.distance_metric,
+                "n_data" : self.n_data
             })
             i += self.chunk_worker
 
@@ -149,7 +150,8 @@ class VentilatorElbow:
                 "n_clusters" : len(centroids),
                 "centroids" : centroids,
                 "type_distance" : self.distance_metric,
-                "position" : i
+                "position" : i,
+                
             })
             i += self.chunk_worker
 

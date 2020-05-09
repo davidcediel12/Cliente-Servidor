@@ -16,7 +16,7 @@ en el rango dado, sino que hace una busqueda ternaria para asi ahorrar iteracion
 """
 class VentilatorElbow:
     max_iters = 1000
-    chunk_worker = 100
+    chunk_worker = 200
     tolerance = 0.01
 
     def createSockets(self):
@@ -43,6 +43,7 @@ class VentilatorElbow:
                 "has_tags" : self.has_tags,
                 "chunk" : self.chunk_worker,
                 "distance_metric" : self.distance_metric,
+                "n_data" : self.n_data
             })
             i += self.chunk_worker
 
@@ -152,7 +153,6 @@ class VentilatorElbow:
         ventilator.kmeans()
         centroids = ventilator.centroids
         n_data = ventilator.n_data
-
         i = 0
         while i < n_data:
             self.to_workers.send_json({

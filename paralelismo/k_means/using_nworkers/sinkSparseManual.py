@@ -51,18 +51,13 @@ class Sink:
             #disponible
             end = False
             while not end:
-                #Inicializo la suma, los clusters y los tags
-                sum_points = []
-                for i in range(self.n_clusters):
-                    sum_points.append({})
-
+                sum_points = np.zeros((self.n_clusters, self.n_features))
                 y = [0] * self.n_data
-
                 for oper in range(self.opers):
                     msg = self.from_ventilator.recv_json()
                     print("Msg recieved from worker")
                     y_temp = msg["tags"]
-                    sum_points_temp = msg["sum_points"]
+                    sum_points_temp = np.asarray(msg["sum_points"])
                     ini = msg["position"]
 
                     fin = ini + self.chunk
@@ -73,21 +68,20 @@ class Sink:
                     for i in range(self.n_clusters):
                         print("Adding points")
                         #Sumo los resultados de cada worker
-                        sum_points[i] = sumPointsDict(sum_points[i], sum_points_temp[i])
+                        sum_points[i] += sum_points_temp[i]
                             
-                
                 sizes = self.calculateSizeClusters(y)
                 #Promedio la suma para encontrar la posicion del centroide
                 for i, size in enumerate(sizes):
                     if size != 0:
-                        for key in sum_points[i].keys():
-                            sum_points[i][key] = sum_points[i][key] / size
+                        sum_points[i] = sum_points[i]/size
+                        # for key in sum_points[i].keys():
+                        #     sum_points[i][key] = sum_points[i][key] / size
 
                 print("Sending to fan")
                 
                 self.to_ventilator.send_json({
-                    #"centroids" : np.ndarray.tolist(sum_points),
-                    "centroids" : sum_points,
+                    "centroids" : np.ndarray.tolist(sum_points),
                     "y" : y,
                     "sizes" : sizes
                 })
