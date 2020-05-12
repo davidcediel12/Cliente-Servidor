@@ -13,25 +13,15 @@ import time
 from sklearn.datasets import make_blobs
 from os.path import join 
 import pandas as pd 
-class Sink:
-
-    #Crea el socket donde le llega la informacion del 
-    #ventilator, que son el numero de clusters
-    def createSockets(self):
-        self.context = zmq.Context()
-
-        self.from_ventilator = self.context.socket(zmq.PULL)
-        self.from_ventilator.bind(f"tcp://{self.dir_sink}")
-
-        self.to_ventilator = self.context.socket(zmq.REQ)
-        self.to_ventilator.connect(f"tcp://{self.dir_ventilator}")
-
-
+from GenericSink import GenericSink, createConsole
+class SinkElbow(GenericSink):
+    #Clase que funciona para recoger la suma de las distorsiones
+    #calculadas por los workers, para asi enviarlos al ventilator
+    
     def recieveFirstMessage(self):
-        msg = self.from_ventilator.recv_json()
-        self.iters = msg["iters"] #Numero de veces que se corre el kmeans
-        self.opers = msg["opers"] #Numero de tareas paralelizadas para calcular 
-                                  #la distorsion en cada momento que se corre kmeans
+        #Numero de tareas paralelizadas para calcular 
+        #la distorsion en cada momento que se corre kmeans
+        self.opers = int(self.from_ventilator.recv_string())
         print("Recieve first message")
 
     #Funcion donde le llegara el mensaje del ventilator
@@ -39,7 +29,7 @@ class Sink:
         print("Ready")
         self.recieveFirstMessage()
 
-        for iter in range(self.iters):
+        while True:
             #Inicializo la suma, los clusters y los tags
             distorsion = 0
             for oper in range(self.opers):
@@ -51,16 +41,7 @@ class Sink:
             self.to_ventilator.send_string(str(distorsion))
             self.to_ventilator.recv()
 
-    def __init__(self, dir_sink, dir_ventilator):
-        self.dir_sink = dir_sink
-        self.dir_ventilator = dir_ventilator
-        self.createSockets()
-
 if __name__ == "__main__":
-    console = argparse.ArgumentParser()
-    console.add_argument("dir_sink", type=str)
-    console.add_argument("dir_ventilator", type=str)
-    args = console.parse_args()
-
-    sink = Sink(args.dir_sink, args.dir_ventilator)
+    args = createConsole()
+    sink = SinkElbow(args.dir_sink, args.dir_ventilator)
     sink.listen()

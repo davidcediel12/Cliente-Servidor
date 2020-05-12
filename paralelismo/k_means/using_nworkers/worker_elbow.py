@@ -13,9 +13,9 @@ from sklearn.datasets import make_blobs
 import pandas as pd
 from os.path import join 
 from utils import *
+from GenericWorker import DenseWorkerGeneric
 
-
-class Worker:
+class Worker(DenseWorkerGeneric):
 
     def readPartDataset(self, ini):
         data = pd.read_csv(join("datasets", self.name_dataset), 
@@ -33,27 +33,20 @@ class Worker:
         tags = tags.astype(int)
         return (values, tags)
 
-    def recieveInitialData(self, msg):
-        #Por ahora no se usa, ya que como no se cuantos workers tengo
-        #no puedo enviar el data set al inicio
-        self.name_dataset = msg["name_dataset"]
-        self.chunk = msg["chunk"]
-        self.distance_metric = msg["distance_metric"]
-        self.has_tags  = msg["has_tags"]
-        print("Recieved first message")
+    
         
 
-    def calculateDistances(self, points, tags):
+    def calculateDistances(self, points, tags, norm_centroids):
         distorsion = 0
         for (p, tag) in zip(points, tags):
             tag = int(tag)
             if self.distance_metric == "euclidean":
                 distorsion += distance.euclidean(p, self.centroids[tag])**2
             elif self.distance_metric == "angular":
-                distorsion += cosineSimilarity(p, self.centroids[tag])**2
+                distorsion += cosineSimilarity(p, self.centroids[tag], norm_centroids[tag])**2
         return distorsion
     
-    
+
     def listen(self): 
         print("Ready")
         while True:
@@ -62,31 +55,15 @@ class Worker:
                     self.recieveInitialData(msg)
                     
             elif msg["action"] == "distance":
-                self.centroids = np.asarray(msg["centroids"])
+                self.centroids, norm_centroids = self.readCentroids()
                 self.n_clusters  = int(msg["n_clusters"])
                 self.name_tags = (self.name_dataset.split(".")[0] + 
                             f"_result{self.n_clusters}c.csv")
                 ini = msg["position"]
                 print("Calculating distorsion")
                 points, tags = self.readPartDataset(ini)
-                distorsion = self.calculateDistances(points, tags)
+                distorsion = self.calculateDistances(points, tags, norm_centroids)
                 self.to_sink.send_string(str(distorsion))
-
-
-    def createSockets(self):
-        self.context = zmq.Context()
-
-        self.from_ventilator = self.context.socket(zmq.PULL)
-        self.from_ventilator.connect(f"tcp://{self.dir_ventilator}")
-
-        self.to_sink = self.context.socket(zmq.PUSH)
-        self.to_sink.connect(f"tcp://{self.dir_sink}")
-
-    def __init__(self, dir_ventilator, dir_sink):
-        self.dir_ventilator = dir_ventilator
-        self.dir_sink = dir_sink
-        self.createSockets()
-
 
 if __name__ == "__main__":
     console = argparse.ArgumentParser()

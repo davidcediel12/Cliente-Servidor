@@ -14,20 +14,16 @@ from sklearn.datasets import make_blobs
 from os.path import join 
 import pandas as pd 
 from operator import add
-class Sink:
+from GenericSink import GenericSink, createConsole
 
-    #Crea el socket donde le llega la informacion del 
-    #ventilator, que son el numero de clusters
-    def createSockets(self):
-        self.context = zmq.Context()
 
-        self.from_ventilator = self.context.socket(zmq.PULL)
-        self.from_ventilator.bind(f"tcp://{self.dir_sink}")
-
-        self.to_ventilator = self.context.socket(zmq.REQ)
-        self.to_ventilator.connect(f"tcp://{self.dir_ventilator}")
+class SinkKMeans(GenericSink):
+    #Clase que recoge los resultados de los workers los cuales son 
+    #el vector de tags y la suma de los puntos para cada cluster para 
+    #asi unirlos 
 
     def recieveFirstMessage(self):
+        #Recibe los datos iniciales para empezar el metodo 
         msg = self.from_ventilator.recv_json()
         self.n_clusters = msg["n_clusters"]
         self.n_data = msg["n_data"]
@@ -40,12 +36,40 @@ class Sink:
         sizes = [0] * self.n_clusters
         for tag in y:
             sizes[tag] += 1
-        return sizes 
+        return sizes
+
+
+    def obtainResultsFromWorker(self):
+        #Obtiene los resultados de los workers y construye el vector 'y' y 
+        #la suma de los puntos de cada cluster
+
+        #Inicializo la suma, los clusters y los tags
+        sum_points = np.zeros((self.n_clusters, self.n_features))
+        sizes = [0] * self.n_clusters
+        y = [0] * self.n_data
+
+        for oper in range(self.opers):
+            msg = self.from_ventilator.recv_json()
+            y_temp = msg["tags"]
+            sum_points_temp = np.asarray(msg["sum_points"])
+            sizes_temp = msg["sizes"]
+            ini = msg["position"]
+
+            fin = ini + self.chunk
+            if fin > self.n_data:
+                fin = self.n_data
+            y[ini:fin] = y_temp.copy() #Voy armando el vector de tags
+
+            for i in range(self.n_clusters):
+                #Sumo los resultados de cada worker
+                sum_points[i] = sum_points[i] + sum_points_temp[i]
+                sizes[i] = sizes[i] + sizes_temp[i]
+        return y, sum_points, sizes
+
 
     #Funcion donde le llegara el mensaje del ventilator
     def listen(self):
         print("Ready")
-
         #Este primer while true me servira para no tener que interrumpir 
         #el sink cada vez que quiero hacer un nuevo k means, asi podra 
         #recibir la data inicial y volver a empezar
@@ -57,33 +81,12 @@ class Sink:
             #disponible
             end = False
             while not end:
-                #Inicializo la suma, los clusters y los tags
-                sum_points = np.zeros((self.n_clusters, self.n_features))
+                y, sum_points, sizes = self.obtainResultsFromWorker()
 
-                y = [0] * self.n_data
-                for oper in range(self.opers):
-                    msg = self.from_ventilator.recv_json()
-                    y_temp = msg["tags"]
-                    sum_points_temp = msg["sum_points"]
-                    ini = msg["position"]
-                    fin = ini + self.chunk
-                    if fin > self.n_data:
-                        fin = self.n_data
-                    y[ini:fin] = y_temp.copy() #Voy armando el vector de tags
-                    for i in range(self.n_clusters):
-                        #Sumo los resultados de cada worker
-                        sum_points[i] = (
-                            list(map(add, sum_points[i], sum_points_temp[i])).copy() )
-                            
-                
-                sizes = self.calculateSizeClusters(y)
-                #Promedio la suma para encontrar la posicion del centroide
-                for i, size in enumerate(sizes):
-                    if size != 0:
-                        sum_points[i] = sum_points[i] / size
-
+                for i in range(len(sum_points)):
+                    sum_points[i] = sum_points[i] / sizes[i]
+                    
                 print("Sending to fan")
-                
                 self.to_ventilator.send_json({
                     "centroids" : np.ndarray.tolist(sum_points),
                     "y" : y,
@@ -91,16 +94,8 @@ class Sink:
                 })
                 end = self.to_ventilator.recv_string() == "end"
 
-    def __init__(self, dir_sink, dir_ventilator):
-        self.dir_sink = dir_sink
-        self.dir_ventilator = dir_ventilator
-        self.createSockets()
 
 if __name__ == "__main__":
-    console = argparse.ArgumentParser()
-    console.add_argument("dir_sink", type=str)
-    console.add_argument("dir_ventilator", type=str)
-    args = console.parse_args()
-
-    sink = Sink(args.dir_sink, args.dir_ventilator)
+    args = createConsole()
+    sink = SinkKMeans(args.dir_sink, args.dir_ventilator)
     sink.listen()
