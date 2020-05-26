@@ -9,3 +9,4 @@ temp*
 **/datasets/*
 **/results_elbow/*
 **.run
+**.exe
