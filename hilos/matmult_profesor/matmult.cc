@@ -47,6 +47,24 @@ void computeCell(const Matrix<T>& a, const Matrix<T>& b, size_t ra, size_t cb,
   }
 }
 
+
+void computeCol(const Matrix& a, const Matrix& b, size_t col, Matrix& result){
+  for(size_t r = 0; r < a.size(); r++){
+    for(size_t c = 0; c < a.size(); c++){
+      result.at(r, col) += a.at(r, c) + b.at(c, col);
+    }
+  }
+}
+
+
+Matrix mult3(const Matrix& a, const Matrix& b){
+  Matrix result(a.size());
+  vector<thread> threads;
+  for(size_t c = 0; c < b.size(); c++)
+  threads.push_back(thread(computeCol, cref(a), cref(b), c, ref(result)));
+}
+
+
 template <typename T>
 Matrix<T> mult2(const Matrix<T>& a, const Matrix<T>& b) {
   assert(a.numCols() == b.numRows());
@@ -182,13 +200,13 @@ void test(size_t n) {
 
     cout << i;
 
-    // Timer t;
-    // Matrix<double> r = mult(a, b);
-    // cout << " - " << t.elapsed();
-    //
-    // Timer t2;
-    // Matrix<double> s = mult2(a, b);
-    // cout << " - " << t2.elapsed();
+    Timer t;
+    Matrix<double> r = mult(a, b);
+    cout << " - " << t.elapsed();
+    
+    Timer t2;
+    Matrix<double> s = mult3(a, b);
+    cout << " - " << t2.elapsed();
     //
     // Timer t2a;
     // Matrix<double> t = mult2a(a, b);
