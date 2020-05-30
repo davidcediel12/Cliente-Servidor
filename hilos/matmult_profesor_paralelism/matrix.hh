@@ -59,7 +59,7 @@ public:
   void fill() {
     random_device rd;
     mt19937 gen(rd());
-    uniform_real_distribution<> dis(1.0, 2.0);
+    uniform_real_distribution<> dis(1.0, 6.0);
     for (size_t i = 0; i < data.size(); i++) {
       data[i] = dis(gen);
     }
